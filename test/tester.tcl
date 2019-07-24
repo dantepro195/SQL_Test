@@ -96,7 +96,7 @@
 # very large database files.
 #
 set tcl_precision 15
-sqlite3_test_control_pending_byte 0x0010000
+#sqlite3_test_control_pending_byte 0x0010000
 
 
 # If the pager codec is available, create a wrapper for the [sqlite3]
@@ -367,21 +367,6 @@ proc execpresql {handle args} {
   }
 }
 
-# This command should be called after loading tester.tcl from within
-# all test scripts that are incompatible with encryption codecs.
-#
-proc do_not_use_codec {} {
-  set ::do_not_use_codec 1
-  reset_db
-}
-unset -nocomplain do_not_use_codec
-
-# Return true if the "reserved_bytes" integer on database files is non-zero.
-#
-proc nonzero_reserved_bytes {} {
-  return [sqlite3 -has-codec]
-}
-
 # Print a HELP message and exit
 #
 proc print_help_and_quit {} {
@@ -461,12 +446,11 @@ if {[info exists cmdlinearg]==0} {
             puts stderr $err
             exit 1
           }
-          sqlite3_memdebug_log start
+#          sqlite3_memdebug_log start
         }
       }
       {^-+backtrace=.+$} {
         foreach {dummy cmdlinearg(backtrace)} [split $a =] break
-        sqlite3_memdebug_backtrace $cmdlinearg(backtrace)
       }
       {^-+binarylog=.+$} {
         foreach {dummy cmdlinearg(binarylog)} [split $a =] break
@@ -527,6 +511,13 @@ if {[info exists cmdlinearg]==0} {
         set cmdlinearg(verbose) 2
       }
 
+
+      # add switch mode
+      {^-+mode=.+$} {
+        foreach {dummy cmdlinearg(switchmode)} [split $a =] break
+        set ::G(switchmode) $cmdlinearg(switchmode)
+      }
+
       default {
         if {[file tail $a]==$a} {
           lappend leftover $a
@@ -549,22 +540,22 @@ if {[info exists cmdlinearg]==0} {
   # Install the malloc layer used to inject OOM errors. And the 'automatic'
   # extensions. This only needs to be done once for the process.
   #
-  sqlite3_shutdown
-  install_malloc_faultsim 1
-  sqlite3_initialize
-  autoinstall_test_functions
+  #sqlite3_shutdown
+  #install_malloc_faultsim 1
+  #sqlite3_initialize
+  #autoinstall_test_functions
 
   # If the --binarylog option was specified, create the logging VFS. This
   # call installs the new VFS as the default for all SQLite connections.
   #
   if {$cmdlinearg(binarylog)} {
-    vfslog new binarylog {} vfslog.bin
+#    vfslog new binarylog {} vfslog.bin
   }
 
   # Set the backtrace depth, if malloc tracing is enabled.
   #
   if {$cmdlinearg(malloctrace)} {
-    sqlite3_memdebug_backtrace $cmdlinearg(backtrace)
+    #sqlite3_memdebug_backtrace $cmdlinearg(backtrace)
   }
 
   if {$cmdlinearg(output)!=""} {
@@ -576,17 +567,13 @@ if {[info exists cmdlinearg]==0} {
   if {$cmdlinearg(verbose)==""} {
     set cmdlinearg(verbose) 1
   }
-
-  if {[info commands vdbe_coverage]!=""} {
-    vdbe_coverage start
-  }
 }
 
 # Update the soft-heap-limit each time this script is run. In that
 # way if an individual test file changes the soft-heap-limit, it
 # will be reset at the start of the next test file.
 #
-sqlite3_soft_heap_limit $cmdlinearg(soft-heap-limit)
+#sqlite3_soft_heap_limit $cmdlinearg(soft-heap-limit)
 
 # Create a test database
 #
@@ -595,8 +582,8 @@ proc reset_db {} {
   forcedelete test.db
   forcedelete test.db-journal
   forcedelete test.db-wal
-  sqlite3 db ./test.db
-  set ::DB [sqlite3_connection_pointer db]
+  sqlite3 db test.db
+  #set ::DB [sqlite3_connection_pointer db]
   if {[info exists ::SETUP_SQL]} {
     db eval $::SETUP_SQL
   }
@@ -609,7 +596,7 @@ if {[info exists TC(count)]} return
 
 # Make sure memory statistics are enabled.
 #
-sqlite3_config_memstatus 1
+#sqlite3_config_memstatus 1
 
 # Initialize the test counters and set up commands to access them.
 # Or, if this is a slave interpreter, set up aliases to write the
@@ -746,8 +733,6 @@ proc do_test {name cmd expected} {
   global argv cmdlinearg
 
   fix_testname name
-
-  sqlite3_memdebug_settitle $name
 
 #  if {[llength $argv]==0} {
 #    set go 1
@@ -1193,7 +1178,7 @@ proc finish_test {} {
   if {0==[info exists ::SLAVE]} { finalize_testing }
 }
 proc finalize_testing {} {
-  global sqlite_open_file_count
+#  global sqlite_open_file_count
 
   set omitList [set_test_counter omit_list]
 
@@ -1201,13 +1186,13 @@ proc finalize_testing {} {
   catch {db2 close}
   catch {db3 close}
 
-  vfs_unlink_test
+#  vfs_unlink_test
   sqlite3 db {}
   # sqlite3_clear_tsd_memdebug
   db close
-  sqlite3_reset_auto_extension
+#  sqlite3_reset_auto_extension
 
-  sqlite3_soft_heap_limit 0
+#  sqlite3_soft_heap_limit 0
   set nTest [incr_ntest]
   set nErr [set_test_counter errors]
 
@@ -1243,7 +1228,7 @@ proc finalize_testing {} {
   foreach warning [set_test_counter warn_list] {
     output2 "Warning: $warning"
   }
-  run_thread_tests 1
+#  run_thread_tests 1
   if {[llength $omitList]>0} {
     output2 "Omitted test cases:"
     set prec {}
@@ -1261,48 +1246,48 @@ proc finalize_testing {} {
     output2 "in your TCL build."
     output2 "******************************************************************"
   }
-  if {$::cmdlinearg(binarylog)} {
-    vfslog finalize binarylog
-  }
-  if {$sqlite_open_file_count} {
-    output2 "$sqlite_open_file_count files were left open"
-    incr nErr
-  }
-  if {[lindex [sqlite3_status SQLITE_STATUS_MALLOC_COUNT 0] 1]>0 ||
-              [sqlite3_memory_used]>0} {
-    output2 "Unfreed memory: [sqlite3_memory_used] bytes in\
-         [lindex [sqlite3_status SQLITE_STATUS_MALLOC_COUNT 0] 1] allocations"
-    incr nErr
-    ifcapable mem5||(mem3&&debug) {
-      output2 "Writing unfreed memory log to \"./memleak.txt\""
-      sqlite3_memdebug_dump ./memleak.txt
-    }
-  } else {
-    output2 "All memory allocations freed - no leaks"
-    ifcapable mem5 {
-      sqlite3_memdebug_dump ./memusage.txt
-    }
-  }
-  show_memstats
-  output2 "Maximum memory usage: [sqlite3_memory_highwater 1] bytes"
-  output2 "Current memory usage: [sqlite3_memory_highwater] bytes"
-  if {[info commands sqlite3_memdebug_malloc_count] ne ""} {
-    output2 "Number of malloc()  : [sqlite3_memdebug_malloc_count] calls"
-  }
-  if {$::cmdlinearg(malloctrace)} {
-    output2 "Writing mallocs.tcl..."
-    memdebug_log_sql mallocs.tcl
-    sqlite3_memdebug_log stop
-    sqlite3_memdebug_log clear
-    if {[sqlite3_memory_used]>0} {
-      output2 "Writing leaks.tcl..."
-      sqlite3_memdebug_log sync
-      memdebug_log_sql leaks.tcl
-    }
-  }
-  if {[info commands vdbe_coverage]!=""} {
-    vdbe_coverage_report
-  }
+#  if {$::cmdlinearg(binarylog)} {
+#    vfslog finalize binarylog
+#  }
+#  if {$sqlite_open_file_count} {
+#    output2 "$sqlite_open_file_count files were left open"
+#    incr nErr
+#  }
+#  if {[lindex [sqlite3_status SQLITE_STATUS_MALLOC_COUNT 0] 1]>0 ||
+#              [sqlite3_memory_used]>0} {
+#    output2 "Unfreed memory: [sqlite3_memory_used] bytes in\
+#         [lindex [sqlite3_status SQLITE_STATUS_MALLOC_COUNT 0] 1] allocations"
+#    incr nErr
+#    ifcapable mem5||(mem3&&debug) {
+#      output2 "Writing unfreed memory log to \"./memleak.txt\""
+#      sqlite3_memdebug_dump ./memleak.txt
+#    }
+#  } else {
+#    output2 "All memory allocations freed - no leaks"
+#    ifcapable mem5 {
+#      sqlite3_memdebug_dump ./memusage.txt
+#    }
+#  }
+#  show_memstats
+#  output2 "Maximum memory usage: [sqlite3_memory_highwater 1] bytes"
+#  output2 "Current memory usage: [sqlite3_memory_highwater] bytes"
+#  if {[info commands sqlite3_memdebug_malloc_count] ne ""} {
+#    output2 "Number of malloc()  : [sqlite3_memdebug_malloc_count] calls"
+#  }
+#  if {$::cmdlinearg(malloctrace)} {
+#    output2 "Writing mallocs.tcl..."
+#    memdebug_log_sql mallocs.tcl
+#    sqlite3_memdebug_log stop
+#    sqlite3_memdebug_log clear
+#    if {[sqlite3_memory_used]>0} {
+#      output2 "Writing leaks.tcl..."
+#      sqlite3_memdebug_log sync
+#      memdebug_log_sql leaks.tcl
+#    }
+#  }
+#  if {[info commands vdbe_coverage]!=""} {
+#    vdbe_coverage_report
+#  }
   foreach f [glob -nocomplain test.db-*-journal] {
     forcedelete $f
   }
@@ -1312,64 +1297,64 @@ proc finalize_testing {} {
   exit [expr {$nErr>0}]
 }
 
-proc vdbe_coverage_report {} {
-  puts "Writing vdbe coverage report to vdbe_coverage.txt"
-  set lSrc [list]
-  set iLine 0
-  if {[file exists ../sqlite3.c]} {
-    set fd [open ../sqlite3.c]
-    set iLine
-    while { ![eof $fd] } {
-      set line [gets $fd]
-      incr iLine
-      if {[regexp {^/\** Begin file (.*\.c) \**/} $line -> file]} {
-        lappend lSrc [list $iLine $file]
-      }
-    }
-    close $fd
-  }
-  set fd [open vdbe_coverage.txt w]
-  foreach miss [vdbe_coverage report] {
-    foreach {line branch never} $miss {}
-    set nextfile ""
-    while {[llength $lSrc]>0 && [lindex $lSrc 0 0] < $line} {
-      set nextfile [lindex $lSrc 0 1]
-      set lSrc [lrange $lSrc 1 end]
-    }
-    if {$nextfile != ""} {
-      puts $fd ""
-      puts $fd "### $nextfile ###"
-    }
-    puts $fd "Vdbe branch $line: never $never (path $branch)"
-  }
-  close $fd
-}
+#proc vdbe_coverage_report {} {
+#  puts "Writing vdbe coverage report to vdbe_coverage.txt"
+#  set lSrc [list]
+#  set iLine 0
+#  if {[file exists ../sqlite3.c]} {
+#    set fd [open ../sqlite3.c]
+#    set iLine
+#    while { ![eof $fd] } {
+#      set line [gets $fd]
+#      incr iLine
+#      if {[regexp {^/\** Begin file (.*\.c) \**/} $line -> file]} {
+#        lappend lSrc [list $iLine $file]
+#      }
+#    }
+#    close $fd
+#  }
+#  set fd [open vdbe_coverage.txt w]
+#  foreach miss [vdbe_coverage report] {
+#    foreach {line branch never} $miss {}
+#    set nextfile ""
+#    while {[llength $lSrc]>0 && [lindex $lSrc 0 0] < $line} {
+#      set nextfile [lindex $lSrc 0 1]
+#      set lSrc [lrange $lSrc 1 end]
+#    }
+#    if {$nextfile != ""} {
+#      puts $fd ""
+#      puts $fd "### $nextfile ###"
+#    }
+#    puts $fd "Vdbe branch $line: never $never (path $branch)"
+#  }
+#  close $fd
+#}
 
 # Display memory statistics for analysis and debugging purposes.
 #
-proc show_memstats {} {
-  set x [sqlite3_status SQLITE_STATUS_MEMORY_USED 0]
-  set y [sqlite3_status SQLITE_STATUS_MALLOC_SIZE 0]
-  set val [format {now %10d  max %10d  max-size %10d} \
-              [lindex $x 1] [lindex $x 2] [lindex $y 2]]
-  output1 "Memory used:          $val"
-  set x [sqlite3_status SQLITE_STATUS_MALLOC_COUNT 0]
-  set val [format {now %10d  max %10d} [lindex $x 1] [lindex $x 2]]
-  output1 "Allocation count:     $val"
-  set x [sqlite3_status SQLITE_STATUS_PAGECACHE_USED 0]
-  set y [sqlite3_status SQLITE_STATUS_PAGECACHE_SIZE 0]
-  set val [format {now %10d  max %10d  max-size %10d} \
-              [lindex $x 1] [lindex $x 2] [lindex $y 2]]
-  output1 "Page-cache used:      $val"
-  set x [sqlite3_status SQLITE_STATUS_PAGECACHE_OVERFLOW 0]
-  set val [format {now %10d  max %10d} [lindex $x 1] [lindex $x 2]]
-  output1 "Page-cache overflow:  $val"
-  ifcapable yytrackmaxstackdepth {
-    set x [sqlite3_status SQLITE_STATUS_PARSER_STACK 0]
-    set val [format {               max %10d} [lindex $x 2]]
-    output2 "Parser stack depth:    $val"
-  }
-}
+#proc show_memstats {} {
+#  set x [sqlite3_status SQLITE_STATUS_MEMORY_USED 0]
+#  set y [sqlite3_status SQLITE_STATUS_MALLOC_SIZE 0]
+#  set val [format {now %10d  max %10d  max-size %10d} \
+#              [lindex $x 1] [lindex $x 2] [lindex $y 2]]
+#  output1 "Memory used:          $val"
+#  set x [sqlite3_status SQLITE_STATUS_MALLOC_COUNT 0]
+#  set val [format {now %10d  max %10d} [lindex $x 1] [lindex $x 2]]
+#  output1 "Allocation count:     $val"
+#  set x [sqlite3_status SQLITE_STATUS_PAGECACHE_USED 0]
+#  set y [sqlite3_status SQLITE_STATUS_PAGECACHE_SIZE 0]
+#  set val [format {now %10d  max %10d  max-size %10d} \
+#              [lindex $x 1] [lindex $x 2] [lindex $y 2]]
+#  output1 "Page-cache used:      $val"
+#  set x [sqlite3_status SQLITE_STATUS_PAGECACHE_OVERFLOW 0]
+#  set val [format {now %10d  max %10d} [lindex $x 1] [lindex $x 2]]
+#  output1 "Page-cache overflow:  $val"
+#  ifcapable yytrackmaxstackdepth {
+#    set x [sqlite3_status SQLITE_STATUS_PARSER_STACK 0]
+#    set val [format {               max %10d} [lindex $x 2]]
+#    output2 "Parser stack depth:    $val"
+#  }
+#}
 
 # A procedure to execute SQL
 #
@@ -1527,37 +1512,37 @@ proc execsql2 {sql} {
 
 # Use a temporary in-memory database to execute SQL statements
 #
-proc memdbsql {sql} {
-  sqlite3 memdb :memory:
-  set result [memdb eval $sql]
-  memdb close
-  return $result
-}
+#proc memdbsql {sql} {
+#  sqlite3 memdb :memory:
+#  set result [memdb eval $sql]
+#  memdb close
+#  return $result
+#}
 
 # Use the non-callback API to execute multiple SQL statements
 #
-proc stepsql {dbptr sql} {
-  set sql [string trim $sql]
-  set r 0
-  while {[string length $sql]>0} {
-    if {[catch {sqlite3_prepare $dbptr $sql -1 sqltail} vm]} {
-      return [list 1 $vm]
-    }
-    set sql [string trim $sqltail]
+#proc stepsql {dbptr sql} {
+#  set sql [string trim $sql]
+#  set r 0
+#  while {[string length $sql]>0} {
+#    if {[catch {sqlite3_prepare $dbptr $sql -1 sqltail} vm]} {
+#      return [list 1 $vm]
+#    }
+#    set sql [string trim $sqltail]
 #    while {[sqlite_step $vm N VAL COL]=="SQLITE_ROW"} {
 #      foreach v $VAL {lappend r $v}
 #    }
-    while {[sqlite3_step $vm]=="SQLITE_ROW"} {
-      for {set i 0} {$i<[sqlite3_data_count $vm]} {incr i} {
-        lappend r [sqlite3_column_text $vm $i]
-      }
-    }
-    if {[catch {sqlite3_finalize $vm} errmsg]} {
-      return [list 1 $errmsg]
-    }
-  }
-  return $r
-}
+#    while {[sqlite3_step $vm]=="SQLITE_ROW"} {
+#      for {set i 0} {$i<[sqlite3_data_count $vm]} {incr i} {
+#        lappend r [sqlite3_column_text $vm $i]
+#      }
+#    }
+#    if {[catch {sqlite3_finalize $vm} errmsg]} {
+#      return [list 1 $errmsg]
+#    }
+#  }
+#  return $r
+#}
 
 # Do an integrity check of the entire database
 #
@@ -1569,59 +1554,60 @@ proc integrity_check {name {db db}} {
 
 # Check the extended error code
 #
-proc verify_ex_errcode {name expected {db db}} {
-  do_test $name [list sqlite3_extended_errcode $db] $expected
-}
+#proc verify_ex_errcode {name expected {db db}} {
+#  do_test $name [list sqlite3_extended_errcode $db] $expected
+#}
 
 
 # Return true if the SQL statement passed as the second argument uses a
 # statement transaction.
 #
-proc sql_uses_stmt {db sql} {
-  set stmt [sqlite3_prepare $db $sql -1 dummy]
-  set uses [uses_stmt_journal $stmt]
-  sqlite3_finalize $stmt
-  return $uses
-}
+#proc sql_uses_stmt {db sql} {
+#  set stmt [sqlite3_prepare $db $sql -1 dummy]
+#  set uses [uses_stmt_journal $stmt]
+#  sqlite3_finalize $stmt
+#  return $uses
+#}
 
-proc fix_ifcapable_expr {expr} {
-  set ret ""
-  set state 0
-  for {set i 0} {$i < [string length $expr]} {incr i} {
-    set char [string range $expr $i $i]
-    set newstate [expr {[string is alnum $char] || $char eq "_"}]
-    if {$newstate && !$state} {
-      append ret {$::sqlite_options(}
-    }
-    if {!$newstate && $state} {
-      append ret )
-    }
-    append ret $char
-    set state $newstate
-  }
-  if {$state} {append ret )}
-  return $ret
-}
+#proc fix_ifcapable_expr {expr} {
+#  set ret ""
+#  set state 0
+#  for {set i 0} {$i < [string length $expr]} {incr i} {
+#    set char [string range $expr $i $i]
+#    set newstate [expr {[string is alnum $char] || $char eq "_"}]
+#    if {$newstate && !$state} {
+#      append ret {$::sqlite_options(}
+#    }
+#    if {!$newstate && $state} {
+#      append ret )
+#    }
+#    append ret $char
+#    set state $newstate
+#  }
+#  if {$state} {append ret )}
+#  return $ret
+#}
 
 # Returns non-zero if the capabilities are present; zero otherwise.
 #
 proc capable {expr} {
-  set e [fix_ifcapable_expr $expr]; return [expr ($e)]
+#  set e [fix_ifcapable_expr $expr]; return [expr ($e)]
+   return 1
 }
 
 # Evaluate a boolean expression of capabilities.  If true, execute the
 # code.  Omit the code if false.
 #
-proc ifcapable {expr code {else ""} {elsecode ""}} {
-  #regsub -all {[a-z_0-9]+} $expr {$::sqlite_options(&)} e2
-  set e2 [fix_ifcapable_expr $expr]
-  if ($e2) {
-    set c [catch {uplevel 1 $code} r]
-  } else {
-    set c [catch {uplevel 1 $elsecode} r]
-  }
-  return -code $c $r
-}
+#proc ifcapable {expr code {else ""} {elsecode ""}} {
+#  #regsub -all {[a-z_0-9]+} $expr {$::sqlite_options(&)} e2
+#  set e2 [expr 1]
+#  if ($e2) {
+#    set c [catch {uplevel 1 $code} r]
+#  } else {
+#    set c [catch {uplevel 1 $elsecode} r]
+#  }
+#  return -code $c $r
+#}
 
 # This proc execs a seperate process that crashes midway through executing
 # the SQL script $sql on database test.db.
@@ -2316,7 +2302,7 @@ proc slave_test_file {zFile} {
   # Add some info to the output.
   #
   output2 "Time: $tail $ms ms"
-  show_memstats
+#  show_memstats
 }
 
 # Open a new connection on database test.db and execute the SQL script
@@ -2468,5 +2454,5 @@ set sqlite_fts3_enable_parentheses 0
 #
 database_never_corrupt
 
-source $testdir/thread_common.tcl
-source $testdir/malloc_common.tcl
+# source $testdir/thread_common.tcl
+# source $testdir/malloc_common.tcl

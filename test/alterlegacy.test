@@ -14,12 +14,6 @@ set testdir [file dirname $argv0]
 source $testdir/tester.tcl
 set testprefix alterlegacy
 
-# If SQLITE_OMIT_ALTERTABLE is defined, omit this file.
-ifcapable !altertable {
-  finish_test
-  return
-}
-
 do_execsql_test 1.0 {
   PRAGMA legacy_alter_table = 1;
   CREATE TABLE t1(a, b, CHECK(t1.a != t1.b));
@@ -162,19 +156,6 @@ do_execsql_test 4.1b {
 do_catchsql_test 4.1c {
   INSERT INTO t1 VALUES(3, 3);
 } {1 {no such table: main.t2}}
-
-proc squish {a} {
-  string trim [regsub -all {[[:space:]][[:space:]]*} $a { }]
-}
-db func squish squish
-do_test 4.2 {
-  execsql { SELECT squish(sql) FROM sqlite_master WHERE name = 'tr1' }
-} [list [squish {
-  CREATE TRIGGER tr1 AFTER INSERT ON "t1" BEGIN
-    SELECT t1.x, * FROM t1, t2;
-    INSERT INTO t2 VALUES(new.x, new.y);
-  END
-}]]
 
 #-------------------------------------------------------------------------
 reset_db
@@ -332,66 +313,7 @@ do_execsql_test 9.6 {
 
 #-------------------------------------------------------------------------
 reset_db
-ifcapable fts5 {
-  do_execsql_test 10.0 {
-    PRAGMA legacy_alter_table = 1;
-    CREATE VIRTUAL TABLE fff USING fts5(x, y, z);
-  }
-
-  do_execsql_test 10.1 {
-    BEGIN;
-      INSERT INTO fff VALUES('a', 'b', 'c');
-      ALTER TABLE fff RENAME TO ggg;
-    COMMIT;
-  }
-
-  do_execsql_test 10.2 {
-    SELECT * FROM ggg;
-  } {a b c}
-}
-
-#-------------------------------------------------------------------------
-reset_db
 forcedelete test.db2
-db func trigger trigger
-set ::trigger [list]
-proc trigger {args} {
-  lappend ::trigger $args
-}
-do_execsql_test 11.0 {
-  PRAGMA legacy_alter_table = 1;
-  ATTACH 'test.db2' AS aux;
-  CREATE TABLE aux.t1(a, b, c);
-  CREATE TABLE main.t1(a, b, c);
-  CREATE TEMP TRIGGER tr AFTER INSERT ON aux.t1 BEGIN
-    SELECT trigger(new.a, new.b, new.c);
-  END;
-}
-
-do_execsql_test 11.1 {
-  INSERT INTO main.t1 VALUES(1, 2, 3);
-  INSERT INTO aux.t1 VALUES(4, 5, 6);
-}
-do_test 11.2 { set ::trigger } {{4 5 6}}
-
-do_execsql_test 11.3 {
-  SELECT name, tbl_name FROM sqlite_temp_master;
-} {tr t1}
-
-do_execsql_test 11.4 {
-  ALTER TABLE main.t1 RENAME TO t2;
-  SELECT name, tbl_name FROM sqlite_temp_master;
-} {tr t1}
-
-do_execsql_test 11.5 {
-  ALTER TABLE aux.t1 RENAME TO t2;
-  SELECT name, tbl_name FROM sqlite_temp_master;
-} {tr t2}
-
-do_execsql_test 11.6 {
-  INSERT INTO aux.t2 VALUES(7, 8, 9);
-}
-do_test 11.7 { set ::trigger } {{4 5 6} {7 8 9}}
 
 #-------------------------------------------------------------------------
 reset_db
@@ -416,41 +338,6 @@ do_execsql_test 12.2 {
 
 
 #-------------------------------------------------------------------------
-reset_db
-
-ifcapable rtree {
-  do_execsql_test 14.0 {
-    PRAGMA legacy_alter_table = 1;
-    CREATE VIRTUAL TABLE rt USING rtree(id, minx, maxx, miny, maxy);
-
-    CREATE TABLE "mytable" ( "fid" INTEGER PRIMARY KEY, "geom" BLOB);
-
-    CREATE TRIGGER tr1 AFTER UPDATE OF "geom" ON "mytable" 
-          WHEN OLD."fid" = NEW."fid" AND NEW."geom" IS NULL BEGIN 
-      DELETE FROM rt WHERE id = OLD."fid"; 
-    END;
-
-    INSERT INTO mytable VALUES(1, X'abcd');
-  }
-
-  do_execsql_test 14.1 {
-    UPDATE mytable SET geom = X'1234'
-  }
-
-  do_execsql_test 14.2 {
-    ALTER TABLE mytable RENAME TO mytable_renamed;
-  }
-
-  do_execsql_test 14.3 {
-    CREATE TRIGGER tr2 AFTER INSERT ON mytable_renamed BEGIN
-      DELETE FROM rt WHERE id=(SELECT min(id) FROM rt);
-    END;
-  }
-
-  do_execsql_test 14.4 {
-    ALTER TABLE mytable_renamed RENAME TO mytable2;
-  }
-}
 
 reset_db
 do_execsql_test 14.5 {

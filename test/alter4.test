@@ -20,12 +20,6 @@ set testdir [file dirname $argv0]
 
 source $testdir/tester.tcl
 
-# If SQLITE_OMIT_ALTERTABLE is defined, omit this file.
-ifcapable !altertable {
-  finish_test
-  return
-}
-
 
 # Test Organisation:
 # ------------------
@@ -90,7 +84,7 @@ do_test alter4-1.5 {
     SELECT sql FROM sqlite_temp_master WHERE tbl_name = 't1';
   }
 } {{CREATE TABLE t1(a, b, c, d CHECK (a>d))}}
-ifcapable foreignkey {
+#ifcapable foreignkey {
   do_test alter4-1.6 {
     execsql {
       CREATE TEMP TABLE t2(a, b, UNIQUE(a, b));
@@ -99,7 +93,7 @@ ifcapable foreignkey {
        WHERE tbl_name = 't2' AND type = 'table';
     }
   } {{CREATE TABLE t2(a, b, c REFERENCES t1(c), UNIQUE(a, b))}}
-}
+#}
 do_test alter4-1.7 {
   execsql {
     CREATE TEMPORARY TABLE t3(a, b, UNIQUE(a, b));
@@ -148,7 +142,7 @@ do_test alter4-2.4 {
     ALTER TABLE t1 ADD c NOT NULL DEFAULT 10;
   }
 } {0 {}}
-ifcapable view {
+#ifcapable view {
   do_test alter4-2.5 {
     execsql {
       CREATE TEMPORARY VIEW v1 AS SELECT * FROM t1;
@@ -157,7 +151,7 @@ ifcapable view {
       alter table v1 add column d;
     }
   } {1 {Cannot add a column to a view}}
-}
+#}
 do_test alter4-2.6 {
   catchsql {
     alter table t1 add column d DEFAULT CURRENT_TIME;
@@ -193,13 +187,6 @@ do_test alter4-3.2 {
     SELECT * FROM t1;
   }
 } {1 100 {} 2 300 {}}
-ifcapable schema_version {
-  do_test alter4-3.4 {
-    execsql {
-      PRAGMA schema_version;
-    }
-  } {10}
-}
 
 do_test alter4-4.1 {
   db close
@@ -223,20 +210,14 @@ do_test alter4-4.2 {
     SELECT * FROM t1;
   }
 } {1 100 {hello world} 2 300 {hello world}}
-ifcapable schema_version {
-  do_test alter4-4.4 {
-    execsql {
-      PRAGMA schema_version;
-    }
-  } {20}
-}
+
 do_test alter4-4.99 {
   execsql {
     DROP TABLE t1;
   }
 } {}
 
-ifcapable attach {
+#ifcapable attach {
   do_test alter4-5.1 {
     forcedelete test2.db
     forcedelete test2.db-journal
@@ -261,13 +242,6 @@ ifcapable attach {
       SELECT * FROM aux.t1;
     }
   } {1 one {} 2 two {}}
-  ifcapable schema_version {
-    do_test alter4-5.4 {
-      execsql {
-        PRAGMA aux.schema_version;
-      }
-    } {31}
-  }
   do_test alter4-5.6 {
     execsql {
       ALTER TABLE aux.t1 ADD COLUMN d DEFAULT 1000;
@@ -279,13 +253,7 @@ ifcapable attach {
       SELECT * FROM aux.t1;
     }
   } {1 one {} 1000 2 two {} 1000}
-  ifcapable schema_version {
-    do_test alter4-5.8 {
-      execsql {
-        PRAGMA aux.schema_version;
-      }
-    } {32}
-  }
+
   do_test alter4-5.9 {
     execsql {
       SELECT * FROM t1;
@@ -297,13 +265,13 @@ ifcapable attach {
       DROP TABLE t1;
     }
   } {}
-}
+#}
 
 #----------------------------------------------------------------
 # Test that the table schema is correctly reloaded when a column
 # is added to a table.
 #
-ifcapable trigger&&tempdb {
+#ifcapable trigger&&tempdb {
   do_test alter4-6.1 {
     execsql {
       CREATE TEMP TABLE t1(a, b);
@@ -327,7 +295,7 @@ ifcapable trigger&&tempdb {
       SELECT * FROM log;
     }
   } {b 1 2 a 1 2 b 3 4 a 3 4}
-}
+#}
 
 # Ticket #1183 - Make sure adding columns to large tables does not cause
 # memory corruption (as was the case before this bug was fixed).
@@ -412,14 +380,5 @@ do_catchsql_test alter4-11.2 {
 do_catchsql_test alter4-11.3 {
   ALTER TABLE t2 ADD COLUMN g;
 } {1 {no such table: t2}}
-
-ifcapable fts5 {
-  do_execsql_test alter4-11.4 {
-    CREATE VIRTUAL TABLE fff USING fts5(f);
-  }
-  do_catchsql_test alter4-11.2 {
-    ALTER TABLE fff ADD COLUMN g;
-  } {1 {virtual tables may not be altered}}
-}
 
 finish_test

@@ -20,12 +20,6 @@ set testdir [file dirname $argv0]
 source $testdir/tester.tcl
 set testprefix altercol
 
-# If SQLITE_OMIT_ALTERTABLE is defined, omit this file.
-ifcapable !altertable {
-  finish_test
-  return
-}
-
 # Drop all the tables and views in the 'main' database of database connect
 # [db]. Sort the objects by name before dropping them.
 #
@@ -329,7 +323,6 @@ do_execsql_test 8.4.2 {
   SELECT sql FROM sqlite_master WHERE name='www';
 } {{CREATE VIEW www AS SELECT bbb FROM b1 UNION ALL SELECT y FROM b2}}
 
-db collate nocase {string compare}
 
 do_execsql_test 8.4.3 {
   CREATE VIEW xxx AS SELECT a FROM b1 UNION SELECT x FROM b2 ORDER BY 1 COLLATE nocase;
@@ -420,65 +413,6 @@ foreach {tn old new lSchema} {
 }
 
 #-------------------------------------------------------------------------
-# Test that views can be edited even if there are missing collation 
-# sequences or user defined functions.
-#
-reset_db
-
-ifcapable vtab {
-  foreach {tn old new lSchema} {
-    1 _x_ _xxx_ {
-      { CREATE TABLE t1(a, b, _x_) }
-      { CREATE VIEW s1 AS SELECT a, b, _x_ FROM t1 WHERE _x_='abc' COLLATE xyz }
-    }
-  
-    2 _x_ _xxx_ {
-      { CREATE TABLE t1(a, b, _x_) }
-      { CREATE VIEW v1 AS SELECT a, b, _x_ FROM t1 WHERE scalar(_x_) }
-    }
-  
-    3 _x_ _xxx_ {
-      { CREATE TABLE t1(a, b, _x_) }
-      { CREATE VIEW v1 AS SELECT a, b, _x_ FROM t1 WHERE _x_ = unicode(1, 2, 3) }
-    }
-  
-    4 _x_ _xxx_ {
-      { CREATE TABLE t1(a, b, _x_) }
-      { CREATE VIRTUAL TABLE e1 USING echo(t1) }
-    }
-  } {
-    register_echo_module db
-    do_rename_column_test 10.$tn $old $new $lSchema
-  }
-  
-  #--------------------------------------------------------------------------
-  # Test that if a view or trigger refers to a virtual table for which the
-  # module is not available, RENAME COLUMN cannot proceed.
-  #
-  reset_db
-  register_echo_module db
-  do_execsql_test 11.0 {
-    CREATE TABLE x1(a, b, c);
-    CREATE VIRTUAL TABLE e1 USING echo(x1);
-  }
-  db close
-  sqlite3 db test.db
-  
-  do_execsql_test 11.1 {
-    ALTER TABLE x1 RENAME b TO bbb;
-    SELECT sql FROM sqlite_master;
-  } { {CREATE TABLE x1(a, bbb, c)} {CREATE VIRTUAL TABLE e1 USING echo(x1)} }
-  
-  do_execsql_test 11.2 {
-    CREATE VIEW v1 AS SELECT e1.*, x1.c FROM e1, x1;
-  }
-  
-  do_catchsql_test 11.3 {
-    ALTER TABLE x1 RENAME c TO ccc;
-  } {1 {error in view v1: no such module: echo}}
-}
-
-#-------------------------------------------------------------------------
 # Test some error conditions:
 #
 #   1. Renaming a column of a system table,
@@ -511,15 +445,6 @@ do_catchsql_test 12.2.2 {
 do_catchsql_test 12.2.3 {
   ALTER TABLE v2 RENAME c TO y;
 } {1 {cannot rename columns of view "v2"}}
-
-ifcapable fts5 {
-  do_execsql_test 12.3.1 {
-    CREATE VIRTUAL TABLE ft USING fts5(a, b, c);
-  }
-  do_catchsql_test 12.3.2 {
-    ALTER TABLE ft RENAME a TO z;
-  } {1 {cannot rename columns of virtual table "ft"}}
-}
 
 do_execsql_test 12.4.1 {
   CREATE TABLE t2(x, y, z);
@@ -803,7 +728,6 @@ do_execsql_test 20.110 {
   ALTER TABLE t1 RENAME cc TO zz;
   SELECT sql FROM sqlite_master WHERE name='t1';
 } {{CREATE TABLE t1(xx UNIQUE,yy UNIQUE,zz UNIQUE,UNIQUE(xx),PRIMARY KEY(yy),UNIQUE(zz))}}
-
 
 
 finish_test
