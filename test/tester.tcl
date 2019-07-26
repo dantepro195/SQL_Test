@@ -1187,9 +1187,9 @@ proc finalize_testing {} {
   catch {db3 close}
 
 #  vfs_unlink_test
-  sqlite3 db {}
+#  sqlite3 db {}
   # sqlite3_clear_tsd_memdebug
-  db close
+#  db close
 #  sqlite3_reset_auto_extension
 
 #  sqlite3_soft_heap_limit 0
@@ -2120,10 +2120,6 @@ proc memdebug_log_sql {filename} {
 
 # Drop all tables in database [db]
 proc drop_all_tables {{db db}} {
-  ifcapable trigger&&foreignkey {
-    set pk [$db one "PRAGMA foreign_keys"]
-    $db eval "PRAGMA foreign_keys = OFF"
-  }
   foreach {idx name file} [db eval {PRAGMA database_list}] {
     if {$idx==1} {
       set master sqlite_temp_master
@@ -2132,16 +2128,13 @@ proc drop_all_tables {{db db}} {
     }
     foreach {t type} [$db eval "
       SELECT name, type FROM $master
-      WHERE type IN('table', 'view') AND name NOT LIKE 'sqliteX_%' ESCAPE 'X'
+      WHERE type IN('table', 'view');
     "] {
       $db eval "DROP $type \"$t\""
     }
   }
-  ifcapable trigger&&foreignkey {
-    $db eval "PRAGMA foreign_keys = $pk"
-  }
 }
-
+drop_all_tables
 # Drop all auxiliary indexes from the main database opened by handle [db].
 #
 proc drop_all_indexes {{db db}} {
@@ -2443,7 +2436,7 @@ proc expand_all_sql {db} {
 
 # If the library is compiled with the SQLITE_DEFAULT_AUTOVACUUM macro set
 # to non-zero, then set the global variable $AUTOVACUUM to 1.
-set AUTOVACUUM $sqlite_options(default_autovacuum)
+# set AUTOVACUUM $sqlite_options(default_autovacuum)
 
 # Make sure the FTS enhanced query syntax is disabled.
 set sqlite_fts3_enable_parentheses 0
@@ -2452,7 +2445,7 @@ set sqlite_fts3_enable_parentheses 0
 # few test cases that deliberately corrupt database files should rescind 
 # this setting by invoking "database_can_be_corrupt"
 #
-database_never_corrupt
+#database_never_corrupt
 
 # source $testdir/thread_common.tcl
 # source $testdir/malloc_common.tcl
